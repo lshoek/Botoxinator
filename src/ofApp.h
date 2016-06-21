@@ -49,5 +49,6 @@ public:
     
     float foreHeadSize;
     ofMesh camMesh;
-
+    int cloneStrength;
+    bool USECAM;
 };
