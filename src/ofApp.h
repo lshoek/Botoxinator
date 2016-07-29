@@ -22,27 +22,36 @@ public:
     ofMesh findForeheadCam();
     ofMesh findForeheadSrc();
     void drawForeheadLine();
-	ofVideoGrabber cam;
-	ofxFaceTrackerThreaded camTracker;
+    void drawForeheadLineSrc();
+    bool showLines;
+    bool isRecording;
+    bool detectionFailed;
+
+    ofVideoGrabber cam;
+	ofxFaceTracker camTracker;
     ofxFaceTracker srcTracker;
     ofVideoPlayer vidPlayer;
+    bool pause;
     
+    void saveFrame();
     ObjectFinder finder;
     ObjectFinder srcFinder;
 	ofVec2f position;
 	float scale;
 	ofVec3f orientation;
 	ofMatrix4x4 rotationMatrix;
-	
+    int frameCounter;
 	Mat translation, rotation;
 	ofMatrix4x4 pose;
-    
+    string vidToLoad;
+    bool drawLines;
     //image overlay stuff
     bool cloneReady;
     Clone clone;
     ofFbo srcFbo, maskFbo;
-    ofImage src;
+    ofImage src, frame;
     vector<ofVec2f> srcPoints;
+    
     ofDirectory faces;
     int currentFace, strength;
     bool cloneVisible;

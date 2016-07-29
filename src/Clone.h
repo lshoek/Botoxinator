@@ -8,10 +8,11 @@ public:
     void setStrength(int strength);
     void update(ofTexture& src, ofTexture& dst, ofTexture& mask);
     void draw(float x, float y);
+    ofFbo buffer;
     
 protected:
     void maskedBlur(ofTexture& tex, ofTexture& mask, ofFbo& result);
-    ofFbo buffer, srcBlur, dstBlur;
+    ofFbo srcBlur, dstBlur;
     ofShader maskBlurShader, cloneShader;
     int strength;
 };
