@@ -19,10 +19,11 @@ public:
     void loadForehead(string face);
     void dragEvent(ofDragInfo dragInfo);
     
-    ofMesh findForeheadCam();
-    ofMesh findForeheadSrc();
-    void drawForeheadLine();
-    void drawForeheadLineSrc();
+	ofPolyline getForeheadPoly(const ofxFaceTracker& t);
+    ofMesh findForehead(const ofxFaceTracker& t);
+
+	void drawForeheadPoints();
+
     bool showLines;
     bool isRecording;
     bool detectionFailed;
@@ -45,19 +46,25 @@ public:
 	ofMatrix4x4 pose;
     string vidToLoad;
     bool drawLines;
+
     //image overlay stuff
     bool cloneReady;
     Clone clone;
     ofFbo srcFbo, maskFbo;
     ofImage src, frame;
-    vector<ofVec2f> srcPoints;
+    vector<glm::vec2> srcPoints;
+	vector<glm::vec2> debugPoints;
     
     ofDirectory faces;
     int currentFace, strength;
     bool cloneVisible;
     
     float foreHeadSize;
+	ofMesh srcMesh;
     ofMesh camMesh;
     int cloneStrength;
+
     bool USECAM;
+	bool DEBUG_FOREHEAD;
+	bool DEBUG_MESHES;
 };
