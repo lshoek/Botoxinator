@@ -11,7 +11,9 @@
 
 /bin/*
 !/bin/data/
-/bin/data/videos/
+/bin/data/videos/*
+
+addons/*
 
 #########
 # general
