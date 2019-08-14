@@ -5,7 +5,7 @@ using namespace ofxCv;
 void ofApp::setup()
 {
 	// Load settings.ini if available
-	appSettings = ofxIniSettings("../settings.ini");
+	appSettings = ofxIniSettings("settings.ini");
 
 	// Use camera, if false it uses the movie. call movie file movie.mp4
 	USECAM = appSettings.get("general.use_cam", false);
