@@ -38,7 +38,7 @@ void ofApp::setup()
 	}
 	else 
 	{
-		vidToLoad = ofFile(!args.empty() ? args[1] : "videos/test.mp4");
+		vidToLoad = ofFile(args.size() > 1 ? args[1] : "videos/test.mp4");
 		
 		vidPlayer.load(vidToLoad.getAbsolutePath());
 		vidLoaded = vidPlayer.isLoaded();
