@@ -1,4 +1,5 @@
-ofxCv
-ofxFaceTracker
 ofxGui
 ofxOpenCv
+ofxCv
+ofxFaceTracker
+ofxIniSettings

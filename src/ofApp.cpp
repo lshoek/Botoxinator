@@ -4,38 +4,55 @@ using namespace ofxCv;
 
 void ofApp::setup()
 {
+	// Load settings.ini if available
+	appSettings = ofxIniSettings("../settings.ini");
+
 	// Use camera, if false it uses the movie. call movie file movie.mp4
-	USECAM = true;
-	pause = false;
-	isRecording = false;
+	USECAM = appSettings.get("general.use_cam", false);
+	AUTO_EXIT = appSettings.get("general.auto_mode", false);
+	DEBUG_TEXT = appSettings.get("debugging.show_text", true);
+	DEBUG_FOREHEAD = appSettings.get("debugging.show_forehead", false);
+	DEBUG_SOURCE = appSettings.get("debugging.show_source", false);
+	DEBUG_LINES = appSettings.get("debugging.show_lines", false);
+	DEBUG_MESH = appSettings.get("debugging.show_mesh", false);
+	isRecording = appSettings.get("general.record_video", false);
+	pauseVideo = appSettings.get("general.pause_video", false);
+	windowRes = glm::vec2(appSettings.get("general.window_width", 1280), appSettings.get("general.window_height", 800));
+	bool windowAutoSize = appSettings.get("general.window_auto", true);
+
+	// instance variables
 	detectionFailed = false;
 	frameCounter = 0;
-	drawLines = true;
-	DEBUG_FOREHEAD = false;
-	DEBUG_MESHES = false;
 
 	// Initial setup, I did not change anything here
 	ofSetVerticalSync(true);
 	ofSetDrawBitmapMode(OF_BITMAPMODE_MODEL_BILLBOARD);
+
 	cloneVisible = true;
 	cloneStrength = 5;
 
-	// load videog
-	showLines = false;
-
 	if (USECAM) 
 	{
-		// initiate camera
 		cam.initGrabber(640, 480);
+		if (windowAutoSize) ofSetWindowShape(cam.getWidth(), cam.getHeight());
 	}
 	else 
 	{
-		vidToLoad = "test";
-		vidPlayer.load(vidToLoad + ".mp4");
-		vidPlayer.setLoopState(OF_LOOP_NORMAL);
+		vidToLoad = ofFile(!args.empty() ? args[1] : "videos/test.mp4");
+		
+		vidPlayer.load(vidToLoad.getAbsolutePath());
+		vidLoaded = vidPlayer.isLoaded();
+		if (!vidLoaded) {
+			ofSystemAlertDialog("Could not load video: Incorrect filepath or incompatible video file. (" + vidToLoad.getAbsolutePath() + ')');
+			ofExit();
+		}
+
+		vidPlayer.setLoopState(OF_LOOP_NONE);
 		vidPlayer.play();
-		vidPlayer.setPaused(true);
+		vidPlayer.setPaused(pauseVideo);
+		if (windowAutoSize) ofSetWindowShape(vidPlayer.getWidth(), vidPlayer.getHeight());
 	}
+	if (!windowAutoSize) ofSetWindowShape(windowRes.x, windowRes.y);
 
 	cloneReady = false;
 	camTracker.setup(); // setup the facecamTracker
@@ -43,26 +60,26 @@ void ofApp::setup()
 	// different settings per case.
 	if (USECAM) 
 	{
-		camTracker.setRescale(0.25);
-		camTracker.setIterations(100);
-		camTracker.setClamp(6);
-		camTracker.setTolerance(.3);
-		camTracker.setAttempts(2);
+		camTracker.setRescale(appSettings.get("tracker_cam.rescale", 0.25f));
+		camTracker.setIterations(appSettings.get("tracker_cam.iterations", 100));
+		camTracker.setClamp(appSettings.get("tracker_cam.clamp", 6.0f));
+		camTracker.setTolerance(appSettings.get("tracker_cam.tolerance", 0.3f));
+		camTracker.setAttempts(appSettings.get("tracker_cam.attempts", 2));
 	}
 	else 
 	{
-		camTracker.setRescale(1);
-		camTracker.setIterations(400);
-		camTracker.setClamp(20);
-		camTracker.setTolerance(.01);
-		camTracker.setAttempts(2);
+		camTracker.setRescale(appSettings.get("tracker_video.rescale", 1.0f));
+		camTracker.setIterations(appSettings.get("tracker_video.iterations", 400));
+		camTracker.setClamp(appSettings.get("tracker_video.clamp", 20.0f));
+		camTracker.setTolerance(appSettings.get("tracker_video.tolerance", .01f));
+		camTracker.setAttempts(appSettings.get("tracker_video.attempts", 2));
 	}
 	srcTracker.setup();
-	srcTracker.setRescale(1);
-	srcTracker.setIterations(200);
-	srcTracker.setClamp(20);
-	srcTracker.setTolerance(.01);
-	srcTracker.setAttempts(125);
+	srcTracker.setRescale(appSettings.get("tracker_source.rescale", 1.0f));
+	srcTracker.setIterations(appSettings.get("tracker_source.iterations", 200));
+	srcTracker.setClamp(appSettings.get("tracker_source.clamp", 20.0f));
+	srcTracker.setTolerance(appSettings.get("tracker_source.tolerance", .01f));
+	srcTracker.setAttempts(appSettings.get("tracker_source.attempts", 125.0f));
 
 	// settings for Clone
 	ofFbo::Settings settings;
@@ -98,6 +115,7 @@ void ofApp::setup()
 	if (faces.size() != 0) {
 		loadForehead(faces.getPath(currentFace));
 	}
+	writeStatus("App setup complete.");
 }
 
 void ofApp::update()
@@ -128,7 +146,6 @@ void ofApp::update()
 		}
 		else 
 		{
-			ofLogNotice("nothing found");
 			// detectionFailed = true;
 		}
 		if (isRecording) 
@@ -138,18 +155,22 @@ void ofApp::update()
 			// camTracker.reset();
 		}
 	}
+	if (vidPlayer.getIsMovieDone()) {
+		writeStatus("End of video.");
+		if (AUTO_EXIT) ofExit();
+	}
 }
 
 void ofApp::draw()
 {
-	if (src.getWidth() > 0) {
+	if (DEBUG_SOURCE && src.getWidth() > 0) {
 		src.draw(640, 0);
 	}
 	if (cloneReady && cloneVisible) {
 		if (!DEBUG_FOREHEAD) clone.draw(0, 0);
 		else srcFbo.draw(0, 0);
 
-		if (DEBUG_MESHES) {
+		if (DEBUG_MESH) {
 			camMesh.drawWireframe();
 
 			ofPushMatrix();
@@ -157,7 +178,7 @@ void ofApp::draw()
 			srcMesh.drawWireframe();
 			ofPopMatrix();
 		}
-		if (showLines) {
+		if (DEBUG_LINES) {
 			drawForeheadPoints(); // press 'l'
 		}
 	}
@@ -166,7 +187,7 @@ void ofApp::draw()
 		else vidPlayer.draw(0, 0);
 	}
 
-	if (drawLines) 
+	if (DEBUG_TEXT)
 	{
 		ofDrawBitmapString(ofToString((int)ofGetFrameRate()), 10, 20);
 		ofDrawBitmapString("Clone Strength: " + ofToString(cloneStrength), 10, 40);
@@ -176,6 +197,9 @@ void ofApp::draw()
 		ofDrawBitmapString("speed: " + ofToString(vidPlayer.getSpeed(), 2), 20, 420);
 		ofDrawBitmapString("is recording: " + ofToString(isRecording), 20, 440);
 	}
+
+	// status text
+	ofDrawBitmapString(statusText, 20, ofGetWindowHeight()-20);
 }
 
 // Function for adding mask over forehead to replace wrinkles based on neutral face
@@ -353,8 +377,13 @@ void ofApp::saveFrame()
 		frame.setFromPixels(pixels);
 	}
 	string imageFileName = ofToString(frameCounter);
-	frame.save("data/caps/" + vidToLoad + "/" + imageFileName + ".png");
+	frame.save("caps/" + vidToLoad.getBaseName() + "/" + imageFileName + ".png");
 	frameCounter++;
+}
+
+void ofApp::writeStatus(string status)
+{
+	statusText = status;
 }
 
 void ofApp::keyPressed(int key)
@@ -362,13 +391,12 @@ void ofApp::keyPressed(int key)
 	switch (key)
 	{
 	case 'r':
-		camTracker.reset();
-		break;
-	case 'R':
 		isRecording = !isRecording;
+		writeStatus(isRecording ? "Started recording." : "Stopped recording. Output saved to " + ofDirectory("caps/" + vidToLoad.getBaseName()).getAbsolutePath());
 		break;
-	case 'v':
+	case 'b':
 		cloneVisible = !cloneVisible;
+		writeStatus(cloneVisible ? "Botox on" : "Botox off");
 		break;
 	case 'f':
 		// decrease forehead size
@@ -380,9 +408,11 @@ void ofApp::keyPressed(int key)
 		break;
 	case 'n':
 		camTracker.reset();
+		writeStatus("Reset cam tracker.");
 		break;
 	case 'N':
 		srcTracker.reset();
+		writeStatus("Reset source tracker.");
 		break;
 	case 's':
 		//decrease  clonestrength
@@ -396,29 +426,31 @@ void ofApp::keyPressed(int key)
 		break;
 	case 'p':
 		// pause
-		pause = !pause;
-		vidPlayer.setPaused(pause);
+		pauseVideo = !pauseVideo;
+		vidPlayer.setPaused(pauseVideo);
+		writeStatus(pauseVideo ? "Video paused." : "Video unpaused.");
 		break;
 	case OF_KEY_LEFT:
 		vidPlayer.previousFrame();
-		ofLogNotice("previousFrame");
+		writeStatus("Frame " + vidPlayer.getCurrentFrame() + '/' + vidPlayer.getTotalNumFrames());
 		break;
 	case OF_KEY_RIGHT:
 		camTracker.reset();
 		vidPlayer.nextFrame();
-		ofLogNotice("nextFrame");
+		writeStatus("Frame " + vidPlayer.getCurrentFrame() + '/' + vidPlayer.getTotalNumFrames());
 		break;
 	case '0':
 		vidPlayer.firstFrame();
+		writeStatus("Frame " + vidPlayer.getCurrentFrame() + '/' + vidPlayer.getTotalNumFrames());
 		break;
 	case 'l':
-		showLines = !showLines;
+		DEBUG_LINES = !DEBUG_LINES;
 		break;
 	case 'd':
-		drawLines = !drawLines;
+		DEBUG_SOURCE = !DEBUG_SOURCE;
 		break;
 	case 'q':
-		DEBUG_MESHES = !DEBUG_MESHES;
+		DEBUG_MESH = !DEBUG_MESH;
 		break;
 	case 'w':
 		DEBUG_FOREHEAD = !DEBUG_FOREHEAD;

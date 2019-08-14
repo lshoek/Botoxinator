@@ -8,6 +8,7 @@ using namespace cv;
 #include "ofxFaceTracker.h"
 #include "Clone.h"
 #include "ofxFaceTrackerThreaded.h"
+#include "ofxIniSettings.h"
 
 class ofApp : public ofBaseApp {
 public:
@@ -23,18 +24,23 @@ public:
     ofMesh findForehead(const ofxFaceTracker& t);
 
 	void drawForeheadPoints();
+	void saveFrame();
+	void writeStatus(string status);
 
-    bool showLines;
+	vector<string> args;
+
+	bool vidLoaded;
     bool isRecording;
     bool detectionFailed;
+
+	ofxIniSettings appSettings;
 
     ofVideoGrabber cam;
 	ofxFaceTracker camTracker;
     ofxFaceTracker srcTracker;
     ofVideoPlayer vidPlayer;
-    bool pause;
+    bool pauseVideo;
     
-    void saveFrame();
     ObjectFinder finder;
     ObjectFinder srcFinder;
 	ofVec2f position;
@@ -44,8 +50,7 @@ public:
     int frameCounter;
 	Mat translation, rotation;
 	ofMatrix4x4 pose;
-    string vidToLoad;
-    bool drawLines;
+    ofFile vidToLoad;
 
     //image overlay stuff
     bool cloneReady;
@@ -63,8 +68,15 @@ public:
 	ofMesh srcMesh;
     ofMesh camMesh;
     int cloneStrength;
+	glm::vec2 windowRes;
+
+	string statusText;
 
     bool USECAM;
+	bool AUTO_EXIT;
+	bool DEBUG_TEXT;
+	bool DEBUG_LINES;
+	bool DEBUG_SOURCE;
 	bool DEBUG_FOREHEAD;
-	bool DEBUG_MESHES;
+	bool DEBUG_MESH;
 };
