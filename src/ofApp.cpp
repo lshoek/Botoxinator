@@ -10,6 +10,7 @@ void ofApp::setup()
 	// Use camera, if false it uses the movie. call movie file movie.mp4
 	USECAM = appSettings.get("general.use_cam", false);
 	AUTO_EXIT = appSettings.get("general.auto_mode", false);
+	HIDE_WND = appSettings.get("general.hide_window", false);
 	DEBUG_TEXT = appSettings.get("debugging.show_text", true);
 	DEBUG_FOREHEAD = appSettings.get("debugging.show_forehead", false);
 	DEBUG_SOURCE = appSettings.get("debugging.show_source", false);
@@ -19,6 +20,9 @@ void ofApp::setup()
 	pauseVideo = appSettings.get("general.pause_video", false);
 	windowRes = glm::vec2(appSettings.get("general.window_width", 1280), appSettings.get("general.window_height", 800));
 	bool windowAutoSize = appSettings.get("general.window_auto", true);
+
+	string defaultVideoPath = "videos/marcello.mp4";
+	string defaultSourcePath = "faces/lowlands.jpg";
 
 	// instance variables
 	detectionFailed = false;
@@ -34,11 +38,12 @@ void ofApp::setup()
 	if (USECAM) 
 	{
 		cam.initGrabber(640, 480);
-		if (windowAutoSize) ofSetWindowShape(cam.getWidth(), cam.getHeight());
+		if (HIDE_WND) hideWindow();
+		else if (windowAutoSize) ofSetWindowShape(cam.getWidth(), cam.getHeight());
 	}
 	else 
 	{
-		vidToLoad = ofFile(args.size() > 1 ? args[1] : "videos/test.mp4");
+		vidToLoad = ofFile(args.size() > 1 ? args[1] : defaultVideoPath);
 		
 		vidPlayer.load(vidToLoad.getAbsolutePath());
 		vidLoaded = vidPlayer.isLoaded();
@@ -50,9 +55,10 @@ void ofApp::setup()
 		vidPlayer.setLoopState(OF_LOOP_NONE);
 		vidPlayer.play();
 		vidPlayer.setPaused(pauseVideo);
-		if (windowAutoSize) ofSetWindowShape(vidPlayer.getWidth(), vidPlayer.getHeight());
+		if (HIDE_WND) hideWindow();
+		else if (windowAutoSize) ofSetWindowShape(vidPlayer.getWidth(), vidPlayer.getHeight());
 	}
-	if (!windowAutoSize) ofSetWindowShape(windowRes.x, windowRes.y);
+	if (!windowAutoSize && !HIDE_WND) ofSetWindowShape(windowRes.x, windowRes.y);
 
 	cloneReady = false;
 	camTracker.setup(); // setup the facecamTracker
@@ -113,7 +119,16 @@ void ofApp::setup()
 	// load standard face from folder /faces.
 	currentFace = 0;
 	if (faces.size() != 0) {
-		loadForehead(faces.getPath(currentFace));
+		string faceFileName = args.size() > 2 ? args[2] : defaultSourcePath;
+		std::vector<ofFile> sourceFaces = faces.getFiles();
+		bool faceFound = false;
+		for (int i = 0; i < sourceFaces.size(); i++) {
+			if (sourceFaces[i].getFileName() == faceFileName) {
+				loadForehead(faces.getPath(currentFace));
+				faceFound = true;
+			}
+		}
+		if (!faceFound) loadForehead(faces.getPath(currentFace));
 	}
 	writeStatus("App setup complete.");
 }
@@ -152,10 +167,10 @@ void ofApp::update()
 		{
 			saveFrame();
 			vidPlayer.nextFrame();
-			// camTracker.reset();
+			camTracker.reset();
 		}
 	}
-	if (vidPlayer.getIsMovieDone()) {
+	if (vidPlayer.getCurrentFrame() == vidPlayer.getTotalNumFrames()) {
 		writeStatus("End of video.");
 		if (AUTO_EXIT) ofExit();
 	}
@@ -163,6 +178,8 @@ void ofApp::update()
 
 void ofApp::draw()
 {
+	if (HIDE_WND) return;
+
 	if (DEBUG_SOURCE && src.getWidth() > 0) {
 		src.draw(640, 0);
 	}
@@ -379,6 +396,12 @@ void ofApp::saveFrame()
 	string imageFileName = ofToString(frameCounter);
 	frame.save("caps/" + vidToLoad.getBaseName() + "/" + imageFileName + ".png");
 	frameCounter++;
+}
+
+void ofApp::hideWindow()
+{
+	ofSetWindowPosition(-10, -10);
+	ofSetWindowShape(1, 1);
 }
 
 void ofApp::writeStatus(string status)

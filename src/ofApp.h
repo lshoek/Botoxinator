@@ -25,6 +25,7 @@ public:
 
 	void drawForeheadPoints();
 	void saveFrame();
+	void hideWindow();
 	void writeStatus(string status);
 
 	vector<string> args;
@@ -74,6 +75,7 @@ public:
 
     bool USECAM;
 	bool AUTO_EXIT;
+	bool HIDE_WND;
 	bool DEBUG_TEXT;
 	bool DEBUG_LINES;
 	bool DEBUG_SOURCE;
