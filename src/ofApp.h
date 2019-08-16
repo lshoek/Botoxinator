@@ -27,6 +27,7 @@ public:
 	void saveFrame();
 	void hideWindow();
 	void writeStatus(string status);
+	void exportExit();
 
 	vector<string> args;
 
@@ -71,6 +72,10 @@ public:
     int cloneStrength;
 	glm::vec2 windowRes;
 
+	float lastFrameUpdate;
+	float lastFrameUpdateTimeout;
+
+	ofDirectory exportDir;
 	string statusText;
 
     bool USECAM;

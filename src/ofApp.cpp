@@ -21,11 +21,12 @@ void ofApp::setup()
 	windowRes = glm::vec2(appSettings.get("general.window_width", 1280), appSettings.get("general.window_height", 800));
 	bool windowAutoSize = appSettings.get("general.window_auto", true);
 
-	string defaultVideoPath = "videos/marcello.mp4";
-	string defaultSourcePath = "faces/lowlands.jpg";
+	string defaultVideoPath = "videos/test.mp4";
+	string defaultSourcePath = "faces/levitt.jpg";
 
 	// instance variables
 	detectionFailed = false;
+	lastFrameUpdateTimeout = 4.0f;
 	frameCounter = 0;
 
 	// Initial setup, I did not change anything here
@@ -44,17 +45,19 @@ void ofApp::setup()
 	else 
 	{
 		vidToLoad = ofFile(args.size() > 1 ? args[1] : defaultVideoPath);
-		
+		exportDir = ofDirectory(vidToLoad.getEnclosingDirectory() + vidToLoad.getBaseName() + "_processed");
+
 		vidPlayer.load(vidToLoad.getAbsolutePath());
 		vidLoaded = vidPlayer.isLoaded();
 		if (!vidLoaded) {
-			ofSystemAlertDialog("Could not load video: Incorrect filepath or incompatible video file. (" + vidToLoad.getAbsolutePath() + ')');
+			ofLog(ofLogLevel::OF_LOG_ERROR, "Could not load video: Incorrect filepath or incompatible video file. (" + vidToLoad.getAbsolutePath() + ')');
 			ofExit();
 		}
 
 		vidPlayer.setLoopState(OF_LOOP_NONE);
 		vidPlayer.play();
 		vidPlayer.setPaused(pauseVideo);
+		vidPlayer.firstFrame();
 		if (HIDE_WND) hideWindow();
 		else if (windowAutoSize) ofSetWindowShape(vidPlayer.getWidth(), vidPlayer.getHeight());
 	}
@@ -119,22 +122,25 @@ void ofApp::setup()
 	// load standard face from folder /faces.
 	currentFace = 0;
 	if (faces.size() != 0) {
-		string faceFileName = args.size() > 2 ? args[2] : defaultSourcePath;
+		ofFile sourceFile = ofFile(defaultSourcePath);
+		string faceFileName = args.size() > 2 ? args[2] : sourceFile.getAbsolutePath();
 		std::vector<ofFile> sourceFaces = faces.getFiles();
 		bool faceFound = false;
 		for (int i = 0; i < sourceFaces.size(); i++) {
-			if (sourceFaces[i].getFileName() == faceFileName) {
-				loadForehead(faces.getPath(currentFace));
+			if (sourceFaces[i].getAbsolutePath() == faceFileName) {
+				loadForehead(faces.getPath(i));
 				faceFound = true;
 			}
 		}
 		if (!faceFound) loadForehead(faces.getPath(currentFace));
 	}
+	printf("Processing %d frames...\n", vidPlayer.getTotalNumFrames());
 	writeStatus("App setup complete.");
 }
 
 void ofApp::update()
 {
+	vidPlayer.getCurrentFrame();
 	if (USECAM) cam.update();	//update camera
 	else vidPlayer.update();	// update vidplayer
 
@@ -148,10 +154,12 @@ void ofApp::update()
 		orientation = camTracker.getOrientation();             //retrieve orientation of face
 		rotationMatrix = camTracker.getRotationMatrix();       //retrieve rotation
 	}
-
-	// different loop for video
 	else if (vidPlayer.isFrameNew())
 	{
+		if (AUTO_EXIT && isRecording)
+		{
+			lastFrameUpdate = ofGetElapsedTimef();
+		}
 		detectionFailed = !camTracker.update(toCv(vidPlayer));
 		if (!detectionFailed) //send camera frame in Cv
 		{                         
@@ -161,7 +169,7 @@ void ofApp::update()
 		}
 		else 
 		{
-			// detectionFailed = true;
+			detectionFailed = true;
 		}
 		if (isRecording) 
 		{
@@ -170,9 +178,13 @@ void ofApp::update()
 			camTracker.reset();
 		}
 	}
+	else if (AUTO_EXIT && isRecording && ofGetElapsedTimef() - lastFrameUpdate > lastFrameUpdateTimeout) {
+		exportExit();
+	}
 	if (vidPlayer.getCurrentFrame() == vidPlayer.getTotalNumFrames()) {
+		printf("Finished.");
 		writeStatus("End of video.");
-		if (AUTO_EXIT) ofExit();
+		if (AUTO_EXIT) exportExit();
 	}
 }
 
@@ -393,8 +405,9 @@ void ofApp::saveFrame()
 		clone.buffer.readToPixels(pixels);
 		frame.setFromPixels(pixels);
 	}
-	string imageFileName = ofToString(frameCounter);
-	frame.save("caps/" + vidToLoad.getBaseName() + "/" + imageFileName + ".png");
+	char* padding = new char[5];
+	sprintf(padding, "%05d", frameCounter);
+	frame.save(exportDir.getAbsolutePath() + "/" + padding + ".png");
 	frameCounter++;
 }
 
@@ -409,13 +422,20 @@ void ofApp::writeStatus(string status)
 	statusText = status;
 }
 
+void ofApp::exportExit()
+{
+	string cmd = "ffmpeg -i " + exportDir.getAbsolutePath() + "/%05d.png -vcodec libx264 -crf 15 -r 30 -pix_fmt yuv420p " + exportDir.getAbsolutePath() + '/' + vidToLoad.getBaseName() + ".mp4";
+	system(cmd.c_str());
+	ofExit();
+}
+
 void ofApp::keyPressed(int key)
 {
 	switch (key)
 	{
 	case 'r':
 		isRecording = !isRecording;
-		writeStatus(isRecording ? "Started recording." : "Stopped recording. Output saved to " + ofDirectory("caps/" + vidToLoad.getBaseName()).getAbsolutePath());
+		writeStatus(isRecording ? "Started recording." : "Stopped recording. Output saved to " + exportDir.getAbsolutePath());
 		break;
 	case 'b':
 		cloneVisible = !cloneVisible;
