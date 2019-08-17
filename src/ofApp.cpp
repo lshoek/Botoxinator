@@ -16,15 +16,22 @@ void ofApp::setup()
 	DEBUG_SOURCE = appSettings.get("debugging.show_source", false);
 	DEBUG_LINES = appSettings.get("debugging.show_lines", false);
 	DEBUG_MESH = appSettings.get("debugging.show_mesh", false);
+	cloneStrength = appSettings.get("botox.strength", 12);
 	isRecording = appSettings.get("general.record_video", false);
 	pauseVideo = appSettings.get("general.pause_video", false);
+	presentationMode = appSettings.get("general.presentation_mode", false);
 	windowRes = glm::vec2(appSettings.get("general.window_width", 1280), appSettings.get("general.window_height", 800));
 	bool windowAutoSize = appSettings.get("general.window_auto", true);
 
-	string defaultVideoPath = "videos/test.mp4";
+	string defaultVideoPath = "videos/test-short.mp4";
 	string defaultSourcePath = "faces/levitt.jpg";
 
+	headerFont.load(ofTrueTypeFontSettings("fonts/Monaco.dfont", 48));
+	bodyFont.load(ofTrueTypeFontSettings("fonts/Monaco.dfont", 24));
+	logo.loadImage("images/logo.png");
+	
 	// instance variables
+	fullScreen = false; 
 	detectionFailed = false;
 	lastFrameUpdateTimeout = 4.0f;
 	frameCounter = 0;
@@ -34,11 +41,10 @@ void ofApp::setup()
 	ofSetDrawBitmapMode(OF_BITMAPMODE_MODEL_BILLBOARD);
 
 	cloneVisible = true;
-	cloneStrength = 5;
 
 	if (USECAM) 
 	{
-		cam.initGrabber(640, 480);
+		cam.initGrabber(1280, 720);
 		if (HIDE_WND) hideWindow();
 		else if (windowAutoSize) ofSetWindowShape(cam.getWidth(), cam.getHeight());
 	}
@@ -127,7 +133,7 @@ void ofApp::setup()
 		std::vector<ofFile> sourceFaces = faces.getFiles();
 		bool faceFound = false;
 		for (int i = 0; i < sourceFaces.size(); i++) {
-			if (sourceFaces[i].getAbsolutePath() == faceFileName) {
+			if (sourceFaces[i].getAbsolutePath() == ofFile(faceFileName).getAbsolutePath()) {
 				loadForehead(faces.getPath(i));
 				faceFound = true;
 			}
@@ -169,7 +175,7 @@ void ofApp::update()
 		}
 		else 
 		{
-			detectionFailed = true;
+			//detectionFailed = true;
 		}
 		if (isRecording) 
 		{
@@ -181,7 +187,7 @@ void ofApp::update()
 	else if (AUTO_EXIT && isRecording && ofGetElapsedTimef() - lastFrameUpdate > lastFrameUpdateTimeout) {
 		exportExit();
 	}
-	if (vidPlayer.getCurrentFrame() == vidPlayer.getTotalNumFrames()) {
+	if (!USECAM && vidPlayer.getCurrentFrame() == vidPlayer.getTotalNumFrames()) {
 		printf("Finished.");
 		writeStatus("End of video.");
 		if (AUTO_EXIT) exportExit();
@@ -196,7 +202,12 @@ void ofApp::draw()
 		src.draw(640, 0);
 	}
 	if (cloneReady && cloneVisible) {
-		if (!DEBUG_FOREHEAD) clone.draw(0, 0);
+		if (!DEBUG_FOREHEAD) {
+			if (fullScreen) {
+				clone.draw(0, 0, ofGetScreenWidth(), ofGetScreenHeight());
+			}
+			else clone.draw(0, 0);
+		}
 		else srcFbo.draw(0, 0);
 
 		if (DEBUG_MESH) {
@@ -211,12 +222,21 @@ void ofApp::draw()
 			drawForeheadPoints(); // press 'l'
 		}
 	}
-	else {
-		if (USECAM) cam.draw(0, 0);
-		else vidPlayer.draw(0, 0);
+	else if (USECAM) {
+		if (fullScreen) cam.draw(0, 0, ofGetScreenWidth(), ofGetScreenHeight());
+		else cam.draw(0, 0);
 	}
+	else vidPlayer.draw(0, 0);
 
-	if (DEBUG_TEXT)
+	if (presentationMode)
+	{
+		bodyFont.drawString("...hoe veranderen verhalen als ze worden doorverteld?", 96, 96);
+		headerFont.drawString(">> Lowlands Whispers <<", 96, 96*2);
+		bodyFont.drawString("Duration: 10 minutes", 96, 96*2 + 64);
+
+		logo.draw(20, ofGetWindowHeight() - logo.getHeight()/2 - 60, logo.getWidth()/2, logo.getHeight()/2);
+	}
+	else if (DEBUG_TEXT)
 	{
 		ofDrawBitmapString(ofToString((int)ofGetFrameRate()), 10, 20);
 		ofDrawBitmapString("Clone Strength: " + ofToString(cloneStrength), 10, 40);
@@ -228,7 +248,7 @@ void ofApp::draw()
 	}
 
 	// status text
-	ofDrawBitmapString(statusText, 20, ofGetWindowHeight()-20);
+	if (!presentationMode) ofDrawBitmapString(statusText, 20, ofGetWindowHeight()-20);
 }
 
 // Function for adding mask over forehead to replace wrinkles based on neutral face
@@ -424,8 +444,12 @@ void ofApp::writeStatus(string status)
 
 void ofApp::exportExit()
 {
-	string cmd = "ffmpeg -i " + exportDir.getAbsolutePath() + "/%05d.png -vcodec libx264 -crf 15 -r 30 -pix_fmt yuv420p " + exportDir.getAbsolutePath() + '/' + vidToLoad.getBaseName() + ".mp4";
-	system(cmd.c_str());
+	string audioCmd = "ffmpeg -i " + vidToLoad.getAbsolutePath() + " -vn -acodec copy " + exportDir.getAbsolutePath() + "/sourceaudio.aac";
+	string exportCmd = "ffmpeg -i " + exportDir.getAbsolutePath() + "/%05d.png -i " + exportDir.getAbsolutePath() + 
+		"/sourceaudio.aac -c:v libx264 -crf 15 -r 30 -pix_fmt yuv420p -c:a aac -shortest -y " + exportDir.getAbsolutePath() + '/' + vidToLoad.getBaseName() + ".mp4";
+
+	system(audioCmd.c_str());
+	system(exportCmd.c_str());
 	ofExit();
 }
 
@@ -485,6 +509,10 @@ void ofApp::keyPressed(int key)
 	case '0':
 		vidPlayer.firstFrame();
 		writeStatus("Frame " + vidPlayer.getCurrentFrame() + '/' + vidPlayer.getTotalNumFrames());
+		break;
+	case 'x':
+		fullScreen = !fullScreen;
+		ofSetFullscreen(fullScreen);
 		break;
 	case 'l':
 		DEBUG_LINES = !DEBUG_LINES;

@@ -34,8 +34,13 @@ public:
 	bool vidLoaded;
     bool isRecording;
     bool detectionFailed;
+	bool presentationMode;
+	bool fullScreen;
 
 	ofxIniSettings appSettings;
+	ofTrueTypeFont headerFont;
+	ofTrueTypeFont bodyFont;
+	ofImage logo;
 
     ofVideoGrabber cam;
 	ofxFaceTracker camTracker;

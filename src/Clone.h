@@ -8,6 +8,7 @@ public:
     void setStrength(int strength);
     void update(ofTexture& src, ofTexture& dst, ofTexture& mask);
     void draw(float x, float y);
+	void draw(float x, float y, float width, float height);
     ofFbo buffer;
     
 protected:
